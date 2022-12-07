@@ -1,0 +1,75 @@
+{
+    "base": {
+        "packages": [
+            {
+                "source": {
+                    "git": {
+                        "location": {
+                            "url": "https://github.com/st4sd/band-gap-gamess.git",
+                            "tag": "1.0.0"
+                        }
+                    }
+                },
+                "config": {
+                    "path": "semi-empirical/homo-lumo-dft-semi-empirical.yaml",
+                    "manifestPath": "semi-empirical/manifest.yaml"
+                }
+            }
+        ]
+    },
+    "metadata": {
+        "package": {
+            "name": "band-gap-pm3-gamess-us",
+            "tags": [
+                "latest",
+                "1.0.0"
+            ],
+            "maintainer": "https://github.com/michael-johnston",
+            "description": "Uses the PM3 semi-empirical method to perform the geometry optimization and calculate the band-gap and related properties. The calculation is performed with GAMESS-US",
+            "keywords": [
+                "smiles",
+                "computational chemistry",
+                "semi-empirical",
+                "geometry-optimization",
+                "pm3",
+                "homo",
+                "lumo",
+                "band-gap",
+                "gamess-us"
+            ]
+        }
+    },
+    "parameterisation": {
+        "presets": {
+            "runtime": {
+                "args": [
+                    "--failSafeDelays=no",
+                    "--registerWorkflow=yes"
+                ]
+            }
+        },
+        "executionOptions": {
+            "variables": [
+                {
+                    "name": "numberMolecules"
+                },
+                {
+                    "name": "startIndex"
+                },
+                {
+                    "name":  "gamess-walltime-minutes"
+                },
+                {
+                    "name":  "gamess-grace-period-seconds"
+                },
+                {
+                    "name":  "number-processors"
+                }
+            ],
+            "platform": [
+                "openshift",
+                "openshift-kubeflux"
+            ]
+        }
+    }
+}

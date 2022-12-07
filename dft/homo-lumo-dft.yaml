@@ -1,0 +1,235 @@
+
+# Copyright IBM Inc. 2015, 2019. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Author(s):
+#   James McDonagh
+#   Michael Johnston
+#   Vassilis Vassiliadis
+
+interface:
+  description: "Measures band-gap and related properties of small molecules in gas-phase using DFT"
+  inputSpec:
+    namingScheme: "SMILES"
+    inputExtractionMethod:
+      hookGetInputIds:
+        source:
+          path: "input/input_smiles.csv"
+  propertiesSpec:
+    - name: "band-gap"
+      description: "The difference between homo and lumo in electron-volts"
+      propertyExtractionMethod:
+        hookGetProperties:
+          source:
+            keyOutput: "OptimisationResults"
+    - name: "homo"
+      description: "The energy of the highest occuppied molecular orbital in electron-volts"
+      propertyExtractionMethod:
+        hookGetProperties:
+          source:
+            keyOutput: "OptimisationResults"
+    - name: "lumo"
+      description: "The energy of the lowest unoccuppied molecular orbital in electron-volts"
+      propertyExtractionMethod:
+        hookGetProperties:
+          source:
+            keyOutput: "OptimisationResults"
+    - name: "electric-moments"
+      description: "The dipole moment in debyes"
+      propertyExtractionMethod:
+        hookGetProperties:
+          source:
+            keyOutput: "OptimisationResults"
+    - name: "total-energy"
+      description: "The total energy of the molecule in electron-volts"
+      propertyExtractionMethod:
+        hookGetProperties:
+          source:
+            keyOutput: "OptimisationResults"
+status-report:
+  0:
+    arguments: '1'
+    executable: echo
+    stage-weight: 0.1
+  1:
+    arguments: '1'
+    executable: echo
+    stage-weight: 0.9
+output:
+  OptimisationResults:
+    data-in: stage1.ExtractEnergies/energies.csv:ref
+    description: homo/lumo results
+    type: csv
+platforms:
+- default
+- openshift
+- openshift-kubeflux
+blueprint:
+  openshift-kubeflux:
+    global:
+      resourceManager:
+        kubernetes:
+          podSpec:
+            schedulerName: kubeflux
+environments:
+  # Platforms that do not override the environments, use the ones that default definess
+  default:
+    GAMESS:
+      #GMSPATH: /gamess/
+      PATH: /usr/local/bin/:$PATH
+      VERNO: "00"
+    PYTHON: {}
+components:
+- stage: 0
+  name: SetBasis
+  command:
+    arguments: sed -i'.bak' -e 's/#BASIS#/%(basis)s/g' input_molecule.txt
+    interpreter: bash
+  references:
+  - data/input_molecule.txt:copy
+- stage: 0
+  name: SetFunctional
+  command:
+    arguments: sed -i'.bak' -e 's/#FUNCTIONAL#/%(functional)s/g' input_molecule.txt
+    interpreter: bash
+  references:
+  - SetBasis/input_molecule.txt:copy
+- stage: 0
+  name: GetMoleculeIndex
+  command:
+    arguments: -c \"print(%(startIndex)s + %(replica)s),\"
+    executable: python
+  workflowAttributes:
+    replicate: '%(numberMolecules)s'
+- stage: 0
+  name: SMILESToGAMESSInput
+  command:
+    arguments: --input input_smiles.csv --template input_molecule.txt --row GetMoleculeIndex:output
+    environment: python
+    executable: bin/rdkit_smiles2coordinates.py
+  references:
+  - input/input_smiles.csv:copy
+  - SetFunctional/input_molecule.txt:copy
+  - GetMoleculeIndex:output
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+    kubernetes:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+    lsf:
+      dockerProfileApp: st4sd
+      queue: normal
+      resourceString: select[hname==tuleta10]
+- stage: 1
+  name: GeometryOptimisation
+  command:
+    arguments: molecule.inp 00 %(number-processors)s
+    environment: gamess
+    executable: bin/run-gamess.sh
+  references:
+  - stage0.SMILESToGAMESSInput/molecule.inp:copy
+  workflowAttributes:
+    restartHookFile: "%(gamess-restart-hook-file)s"
+    restartHookOn:
+    - KnownIssue
+    - Success
+    - ResourceExhausted
+    shutdownOn:
+    - KnownIssue
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+      walltime: "%(gamess-walltime-minutes)s"
+    kubernetes:
+      gracePeriod: "%(gamess-grace-period-seconds)s"
+      image: nvcr.io/hpc/gamess:17.09-r2-libcchem
+    lsf:
+      dockerProfileApp: st4sd
+      queue: normal
+      resourceString: select[hname==tuleta10]
+  resourceRequest:
+    memory: '%(mem)s'
+    numberThreads: '%(number-processors)s'
+    threadsPerCore: 1
+- stage: 1
+  name: AnalyzeEnergies
+  command:
+    arguments: -f GeometryOptimisation:ref/out.stdout*
+    environment: python
+    executable: bin/features_and_convergence.py
+  references:
+  - GeometryOptimisation:ref
+  workflowAttributes:
+    shutdownOn:
+    - KnownIssue
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+    kubernetes:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+    lsf:
+      queue: normal
+      resourceString: select[hname==tuleta10]
+- stage: 1
+  name: CreateLabels
+  command:
+    arguments: >-
+      -c "import pandas; 
+      input_file='input/input_smiles.csv:ref'; 
+      row_indices='stage0.GetMoleculeIndex:output'; 
+      m=pandas.read_csv(input_file, engine='python', sep=None); 
+      print(','.join([str(m.iloc[int(index)]['%(collabel)s']) for index in row_indices.split()]))"
+    expandArguments: "none"
+    executable: python
+  references:
+  - stage0.GetMoleculeIndex:output
+  - input/input_smiles.csv:ref
+  workflowAttributes:
+    aggregate: true
+- stage: 1
+  name: ExtractEnergies
+  command:
+    arguments: -l CreateLabels:output GeometryOptimisation:ref
+    environment: python
+    executable: bin/extract_gmsout.py
+  references:
+  - GeometryOptimisation:ref
+  - CreateLabels:output
+  workflowAttributes:
+    aggregate: true
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+    kubernetes:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+    lsf:
+      queue: normal
+      resourceString: select[hname==tuleta10]
+variables:
+  default:
+    global:
+      # VV: References python script in hooks directory to use for restartHook of GeometryOptimisation
+      gamess-restart-hook-file: dft_restart.py
+      defaultq: normal
+      mem: '4295000000'
+      backend: local
+      number-processors: '8'
+      startIndex: '0'
+      numberMolecules: '1'
+      basis: GBASIS=N31 NGAUSS=6 NDFUNC=2 NPFUNC=1 DIFFSP=.TRUE. DIFFS=.TRUE.
+      functional: B3LYP
+      collabel: label
+      # VV: how long k8s should let the pod run before it sends it a SIGTERM
+      gamess-walltime-minutes: 700
+      # VV: how long k8s should wait between SIGTERM and SIGKILL
+      gamess-grace-period-seconds: 1800
+    stages:
+      0:
+        stage-name: SMILES_to_GAMESS
+      1:
+        stage-name: GeometryOptimisationRun
+  openshift:
+    global:
+      backend: kubernetes
+  openshift-kubeflux:
+    global:
+      backend: kubernetes

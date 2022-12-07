@@ -1,0 +1,87 @@
+{
+    "metadata": {
+        "package": {
+            "description": "Uses the DFT functional and basis set B3LYP/6-31G(d,p) with Grimme et al's D3 correction to perform geometry optimization and HOMO-LUMO band gap calculation",
+            "keywords": [
+                "smiles",
+                "computational chemistry",
+                "homo-lumo",
+                "semi-empirical",
+                "kubeflux"
+            ],
+            "maintainer": "https://github.com/michael-johnston",
+            "name": "band-gap-dft-gamess-us",
+            "tags": [
+                "latest",
+                "1.0.0"
+            ]
+        }
+    },
+    "base": {
+        "packages": [
+            {
+                "config": {
+                    "manifestPath": "dft/manifest.yaml",
+                    "path": "dft/homo-lumo-dft.yaml"
+                },
+                "name": "main",
+                "source": {
+                    "git": {
+                        "location": {
+                            "tag": "1.0.0",
+                            "url": "https://github.com/st4sd/band-gap-gamess.git"
+                        }
+                    }
+                }
+            }
+        ]
+    },
+    "parameterisation": {
+        "executionOptions": {
+            "data": [],
+            "platform": [
+                "openshift",
+                "openshift-kubeflux"
+            ],
+            "variables": [
+                {
+                    "name": "numberMolecules"
+                },
+                {
+                    "name": "startIndex"
+                },
+                {
+                    "name": "mem"
+                },
+                {
+                    "name":  "gamess-walltime-minutes"
+                },
+                {
+                    "name":  "gamess-grace-period-seconds"
+                },
+                {
+                    "name":  "number-processors"
+                }
+            ]
+        },
+        "presets": {
+            "environmentVariables": [],
+            "runtime": {
+                "args": [
+                    "--failSafeDelays=no",
+                    "--registerWorkflow=yes"
+                ]
+            },
+            "variables": [
+                {
+                    "name": "functional",
+                    "value": "B3LYP"
+                },
+                {
+                    "name": "basis",
+                    "value": "GBASIS=N31 NGAUSS=6 NDFUNC=2 NPFUNC=1 DIFFSP=.TRUE. DIFFS=.TRUE."
+                }
+            ]
+        }
+    }
+}
