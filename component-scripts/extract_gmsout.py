@@ -142,6 +142,7 @@ if __name__ == "__main__":
     # MPI kickoff will start GAMESS on 1 cores in 1 nodes.
 
     regex_cores_nodes = re.compile(r"MPI kickoff will start GAMESS on ([0-9]+) cores in ([0-9]+) nodes\.")
+    coreno = 1
 
     for (f_out,f2) in zip(args,options.labels.split(',')):
         
