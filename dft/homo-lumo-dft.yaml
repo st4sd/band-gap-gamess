@@ -138,7 +138,7 @@ components:
       -g stage0.SetFunctional/input_molecule.txt:ref -sp stage0.SMILESToXYZ:ref 
       -sf GetMoleculeIndex:output
     environment: python
-    executable: bin/rdkit_smiles2coordinates.py
+    executable: bin/make_gamess_input_from_template_and_xyz.py
   references:
   - stage0.SMILESToXYZ:ref
   - stage0.SetFunctional/input_molecule.txt:ref
