@@ -134,9 +134,9 @@ components:
 - stage: 0
   name: XYZToGAMESS
   command:
-    arguments: -xp stage0.SMILESToXYZ:ref -xf GetMoleculeIndex:output 
+    arguments: -xp stage0.SMILESToXYZ:ref -xf GetMoleculeIndex:output.xyz 
       -g stage0.SetFunctional/input_molecule.txt:ref -sp stage0.SMILESToXYZ:ref 
-      -sf GetMoleculeIndex:output
+      -sf GetMoleculeIndex:output.sdf
     environment: python
     executable: bin/make_gamess_input_from_template_and_xyz.py
   references:
