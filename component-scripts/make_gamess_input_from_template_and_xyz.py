@@ -232,7 +232,7 @@ def main():
                             metavar="FILEPATH",
                             action="store",
                             required=True,
-                            help="xyz file to read")
+                            help="xyz file to read (row index, expects a file with the name ${index}.xyz)")
 
         parser.add_argument("-g",
                             "--gamess_template",
@@ -246,7 +246,7 @@ def main():
                             "--sdf",
                             type=str,
                             action="store",
-                            help="smiles for the molecule",
+                            help="smiles for the molecule (row index, expects a file with the name ${index}.sdf)",
                             required=True)
 
         parser.add_argument("-sp",
@@ -295,6 +295,12 @@ def main():
     log.info("Command line input =\n\t{}".format(op))
 
     # These are separated for the ST4SD engine so it is easier to specify
+    if op.xyz_file and op.xyz_file.endswith('.xyz') is False:
+        op.xyz_file = ".".join((op.xyz_file, "xyz"))
+
+    if op.sdf and op.sdf.endswith('.sdf') is False:
+        op.sdf = ".".join((op.sdf, "sdf"))
+
     op.xyz_file = os.path.join(op.xyz_path, op.xyz_file)
     op.sdf = os.path.join(op.sdf_path, op.sdf)
 
