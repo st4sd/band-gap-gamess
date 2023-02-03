@@ -1,4 +1,3 @@
-
 # Copyright IBM Inc. 2017, 2018, 2019, 2020. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 # Author(s):
@@ -241,6 +240,14 @@ def get_consistent_orbs_and_geom(filein, search_start_term_geom="COORDINATES OF 
     start_indexes_orbitals.reverse()
     end_indexes_orbitals.reverse()
 
+    if len(start_indexes_geom) == len(end_indexes_geom) + 1:
+        log.warning(f"GenGeometry was interrupted, removing last")
+        start_indexes_geom.pop(0)
+
+    if len(start_indexes_orbitals) == len(end_indexes_orbitals) + 1:
+        log.warning(f"GenOrbitals was interrupted, removing last")
+        end_indexes_orbitals.pop(0)
+
     if not all(len(ent) == len(start_indexes_geom) for ent in [start_indexes_geom,
                                                                end_indexes_geom,
                                                                start_indexes_orbitals,
@@ -291,10 +298,12 @@ def get_consistent_orbs_and_geom(filein, search_start_term_geom="COORDINATES OF 
                 log.info("Intermediate lines fall in the correct range as expected")
                 fail = False
             else:
-                log.info("start_orbit line is not in the  correct range")
+                log.info(f"start_orbit line is not in the  correct range, start_geom {start_geom}, "
+                         f"stop_geom {stop_geom}, stop_orbit {stop_orbit}")
                 fail = True
         else:
-            log.info("stop_geom line is not in the  correct range")
+            log.info(f"stop_geom line is not in the  correct range start_geom {start_geom}, "
+                         f"stop_geom {stop_geom}, stop_orbit {stop_orbit}")
             fail = True
 
         # check stop_orbit is larger than stop_orbital[i]
@@ -311,6 +320,7 @@ def get_consistent_orbs_and_geom(filein, search_start_term_geom="COORDINATES OF 
     with open(filein) as fin:
         log.info("Successfully found geometry and orbitals\n")
         geometry = [l.strip() for ind, l in enumerate(fin) if start_geom <= ind < stop_geom]
+        log.info(f"Geometry: {geometry}")
         log.info("Geometry:\n{}\n.....\n{}\nLength {}\n".format(geometry[0], geometry[-1], len(geometry)))
         fin.seek(0)
 
@@ -730,135 +740,138 @@ def Restart(workingDirectory, restarts, componentName, log, exitReason, exitCode
         log.info("No restart hook for component")
         return experiment.model.codes.restartContexts['RestartContextHookNotAvailable']
 
-    if retgopt or retenr:
+    # make a backup sub-directory
+    dirNam = "Run{}".format(restarts)
+    path = os.path.join(workingDirectory, dirNam)
+    if not os.path.exists(path):
+        os.makedirs(os.path.join(workingDirectory, dirNam))
+    else:
+        log.warning("Path {} already exists, exiting restart and closing experiment".format(path))
+        return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
 
-        # make a backup sub-directory
-        dirNam = "Run{}".format(restarts)
-        path = os.path.join(workingDirectory, dirNam)
-        if not os.path.exists(path):
-            os.makedirs(os.path.join(workingDirectory, dirNam))
-        else:
-            log.warning("Path {} already exists, exiting restart and closing experiment".format(path))
+    # copy all content files to the backup directory
+    files = [f for f in os.listdir(workingDirectory) if os.path.isfile(os.path.join(workingDirectory, f))]
+    for f in files:
+        cpath = os.path.join(workingDirectory, f)
+        shutil.copy2(cpath, path)
+    log.info("A backup of the {} run is now stored in {}".format(restarts, path))
+
+    # edit input files for restart methods
+    gamess_input = glob.glob(os.path.join(workingDirectory, "*.inp"))
+    gamess_dat_punch_file = glob.glob(os.path.join(workingDirectory, "*.dat"))
+    # TODO: specific name is there a better way?
+    gamess_out_file = glob.glob(os.path.join(workingDirectory, "out.stdout"))
+    if len(gamess_input) == 0:
+        log.error("Restart cannot find the appropriate gamess input (*.inp) file in {}".format(workingDirectory))
+        # raise RuntimeError("ERROR - cannot find GAMESS input file *.inp")
+        return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
+    elif len(gamess_input) > 1:
+        log.error("Restart has found more than one gamess input (*.inp) file in {}\nFiles found {}".format(
+            workingDirectory, gamess_input))
+        # raise RuntimeError("ERROR- found more than one GAMESS input file *.inp")
+        return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
+    else:
+        gamess_input = gamess_input[0]
+
+    found_dat = True
+    found_out = True
+
+    if len(gamess_dat_punch_file) == 0:
+        log.error("Restart cannot find the appropriate gamess punch (*.dat) file in {}".format(workingDirectory))
+        # raise RuntimeError("ERROR - cannot find GAMESS punch file *.dat")
+        found_dat = False
+    elif len(gamess_dat_punch_file) > 1:
+        log.error("Restart has found more than one gamess punch (*.dat) file in {}\nFiles found {}".format(
+            workingDirectory, gamess_dat_punch_file))
+        # raise RuntimeError("ERROR found more than one GAMESS punch file *.dat")
+        return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
+    else:
+        gamess_dat_punch_file = gamess_dat_punch_file[0]
+
+    if len(gamess_out_file) == 0:
+        log.error(
+            "Restart cannot find the appropriate gamess out file (out.stdout) file in {}".format(workingDirectory))
+        found_out = False
+        # raise RuntimeError("ERROR - cannot find GAMESS punch file *.dat")
+    elif len(gamess_out_file) > 1:
+        log.error("Restart has found more than one gamess out file (out.stdout) file in {}\nFiles found {}".format(
+            workingDirectory, gamess_dat_punch_file))
+        # raise RuntimeError("ERROR found more than one GAMESS punch file *.dat")
+        return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
+    else:
+        gamess_out_file = gamess_out_file[0]
+
+    if not found_dat and not found_out:
+        # Looks like this never ran just run as normal
+        log.warning("Looks like component %s never ran - can rerun without any additional prep" % componentName)
+        return experiment.model.codes.restartContexts["RestartContextRestartPossible"]
+
+    # TODO: Add specific error message check and make variations
+    # this is harder to do as the documentation is very poor so it is hard to know what to do
+    # with specific errors outside of the general cases I have already dealt with.
+    # the most common case seems to require changing QMTTOL this is done by default at the
+    # momement.
+    # determine if restart is needed as this hook is called even on supposedly successful GAMESS components
+    restart_needed = determine_gamess_exit_reason(gamess_out_file, componentName)
+    restart_context = experiment.model.codes.restartContexts[
+        'RestartContextRestartPossible'] if restart_needed is True else experiment.model.codes.restartContexts[
+        'RestartContextRestartNotRequired']
+
+    log.info("GAMESS Input: {} GAMESS punch file {} GAMESS out file {}".format(gamess_input, gamess_dat_punch_file,
+                                                                               gamess_out_file))
+
+    if restart_context == experiment.model.codes.restartContexts['RestartContextRestartPossible']:
+
+        log.info("Restart is determined to be required for GAMESS")
+
+        geometry, molecular_orbitals = get_consistent_orbs_and_geom(gamess_dat_punch_file)
+
+        # mol_orbs = get_vec_data(gamess_dat_punch_file)
+
+        if geometry is False:
             return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
 
-        # copy all content files to the backup directory
-        files = [f for f in os.listdir(workingDirectory) if os.path.isfile(os.path.join(workingDirectory, f))]
-        for f in files:
-            cpath = os.path.join(workingDirectory, f)
-            shutil.copy2(cpath, path)
-        log.info("A backup of the {} run is now stored in {}".format(restarts, path))
-
-        # edit input files for restart methods
-        gamess_input = glob.glob(os.path.join(workingDirectory, "*.inp"))
-        gamess_dat_punch_file = glob.glob(os.path.join(workingDirectory, "*.dat"))
-        # TODO: specific name is there a better way?
-        gamess_out_file = glob.glob(os.path.join(workingDirectory, "out.stdout"))
-        if len(gamess_input) == 0:
-            log.error("Restart cannot find the appropriate gamess input (*.inp) file in {}".format(workingDirectory))
-            # raise RuntimeError("ERROR - cannot find GAMESS input file *.inp")
+        if molecular_orbitals is False:
             return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
-        elif len(gamess_input) > 1:
-            log.error("Restart has found more than one gamess input (*.inp) file in {}\nFiles found {}".format(
-                workingDirectory, gamess_input))
-            # raise RuntimeError("ERROR- found more than one GAMESS input file *.inp")
+
+        template_data = get_template_data(gamess_input)
+        if template_data is False:
             return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
-        else:
-            gamess_input = gamess_input[0]
 
-        found_dat = True
-        found_out = True
-
-        if len(gamess_dat_punch_file) == 0:
-            log.error("Restart cannot find the appropriate gamess punch (*.dat) file in {}".format(workingDirectory))
-            # raise RuntimeError("ERROR - cannot find GAMESS punch file *.dat")
-            found_dat = False
-        elif len(gamess_dat_punch_file) > 1:
-            log.error("Restart has found more than one gamess punch (*.dat) file in {}\nFiles found {}".format(
-                workingDirectory, gamess_dat_punch_file))
-            # raise RuntimeError("ERROR found more than one GAMESS punch file *.dat")
+        norbs = count_molecular_orbitals(molecular_orbitals, gamess_out_file)
+        if norbs is False:
             return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
-        else:
-            gamess_dat_punch_file = gamess_dat_punch_file[0]
 
-        if len(gamess_out_file) == 0:
-            log.error(
-                "Restart cannot find the appropriate gamess out file (out.stdout) file in {}".format(workingDirectory))
-            found_out = False
-            # raise RuntimeError("ERROR - cannot find GAMESS punch file *.dat")
-        elif len(gamess_out_file) > 1:
-            log.error("Restart has found more than one gamess out file (out.stdout) file in {}\nFiles found {}".format(
-                workingDirectory, gamess_dat_punch_file))
-            # raise RuntimeError("ERROR found more than one GAMESS punch file *.dat")
-            return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
-        else:
-            gamess_out_file = gamess_out_file[0]
+        write_file(gamess_input, geometry=geometry, template_data=template_data,
+                   molecular_orbitals=molecular_orbitals, norbs=norbs, restart=restarts)
 
-        if not found_dat and not found_out:
-            # Looks like this never ran just run as normal
-            log.warning("Looks like component %s never ran - can rerun without any additional prep" % componentName)
-            return experiment.model.codes.restartContexts["RestartContextRestartPossible"]
+        if delete_old is True:
+            all_fs = [os.path.join(workingDirectory, f) for f in os.listdir(workingDirectory) if
+                      os.path.isfile(os.path.join(workingDirectory, f))]
+            excluded_file_types = [".inp", ".stdout", ".out", ".log", ".stderr", ".err", ".py"]
+            for ent in excluded_file_types:
+                all_fs = [elm for elm in all_fs if ent not in elm]
 
-        # TODO: Add specific error message check and make variations
-        # this is harder to do as the documentation is very poor so it is hard to know what to do
-        # with specific errors outside of the general cases I have already dealt with.
-        # the most common case seems to require changing QMTTOL this is done by default at the
-        # momement.
-        # determine if restart is needed as this hook is called even on supposedly successful GAMESS components
-        restart_needed = determine_gamess_exit_reason(gamess_out_file, componentName)
-        restart_context = experiment.model.codes.restartContexts[
-            'RestartContextRestartPossible'] if restart_needed is True else experiment.model.codes.restartContexts[
-            'RestartContextRestartNotRequired']
+            for ent in all_fs:
+                os.remove(ent)
 
-        log.info("GAMESS Input: {} GAMESS punch file {} GAMESS out file {}".format(gamess_input, gamess_dat_punch_file,
-                                                                                   gamess_out_file))
+        return restart_context
 
-        if restart_context == experiment.model.codes.restartContexts['RestartContextRestartPossible']:
-
-            log.info("Restart is determined to be required for GAMESS")
-
-            geometry, molecular_orbitals = get_consistent_orbs_and_geom(gamess_dat_punch_file)
-
-            # mol_orbs = get_vec_data(gamess_dat_punch_file)
-
-            if geometry is False:
-                return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
-
-            if molecular_orbitals is False:
-                return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
-
-            template_data = get_template_data(gamess_input)
-            if template_data is False:
-                return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
-
-            norbs = count_molecular_orbitals(molecular_orbitals, gamess_out_file)
-            if norbs is False:
-                return experiment.model.codes.restartContexts['RestartContextRestartNotPossible']
-
-            write_file(gamess_input, geometry=geometry, template_data=template_data,
-                       molecular_orbitals=molecular_orbitals, norbs=norbs, restart=restarts)
-
-            if delete_old is True:
-                all_fs = [os.path.join(workingDirectory, f) for f in os.listdir(workingDirectory) if
-                          os.path.isfile(os.path.join(workingDirectory, f))]
-                excluded_file_types = [".inp", ".stdout", ".out", ".log", ".stderr", ".err", ".py"]
-                for ent in excluded_file_types:
-                    all_fs = [elm for elm in all_fs if ent not in elm]
-
-                for ent in all_fs:
-                    os.remove(ent)
-
-            return restart_context
-
-        else:
-            log.info("Restart is not required for GAMESS")
-            return restart_context
+    else:
+        log.info("Restart is not required for GAMESS")
+        return restart_context
 
 
 if __name__ == "__main__":
     # For testing
     # Format routine the message comes from, the leve of the information debug, info, warning, error, critical
     # writes all levels to teh log file Optimizer.log
-    pathlog = os.path.join(os.getcwd(), 'test.log')
+    try:
+        path = sys.argv[1]
+    except IndexError:
+        path = os.getcwd()
+    pathlog = os.path.join(path, 'test.log')
+
     logging.basicConfig(format='%(message)s', filemode='w', filename=pathlog, level=logging.INFO)
 
     # Setup handle for screen printing only prints info and above not debugging info
@@ -869,4 +882,6 @@ if __name__ == "__main__":
     log = logging.getLogger(__name__)
 
     log.info('Started {}\n'.format(datetime.now()))
-    Restart(os.getcwd(), 4, "GeometryOptimisation", log, "ResourceExhausted", 1)
+    x = Restart(path, 4, "GeometryOptimisation", log, "ResourceExhausted", 1)
+
+    log.info(f"Restart: {x}")
