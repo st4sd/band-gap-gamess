@@ -85,7 +85,6 @@ environments:
   openshift-cpu:
     GAMESS:
       GMSPATH: /gamess/
-      DEFAULTS: PATH
       PATH: /gamess/:$PATH
 
 components:
