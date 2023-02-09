@@ -61,6 +61,9 @@
                 },
                 {
                     "name":  "number-processors"
+                },
+                {
+                    "name":  "gamess-gpus"
                 }
             ]
         },
