@@ -80,7 +80,6 @@ environments:
     GAMESS:
       #GMSPATH: /gamess/
       PATH: /usr/local/bin/:$PATH
-      VERNO: "00"
     PYTHON: {}
   openshift-cpu:
     GAMESS:
@@ -238,7 +237,7 @@ variables:
       # VV: how long k8s should wait between SIGTERM and SIGKILL
       gamess-grace-period-seconds: 1800
       gamess-gpus: 0
-      gamess-version: 00
+      gamess-version: "00"
     stages:
       0:
         stage-name: SMILES_to_GAMESS
@@ -256,4 +255,4 @@ variables:
       gamess-restart-hook-file: cpu_dft_restart.py
       gamess-image: res-st4sd-community-team-applications-docker-virtual.artifactory.swg-devops.com/gamess-st4sd:2019.11.30
       gamess-command: rungms
-      gamess-version: 01
+      gamess-version: "01"
