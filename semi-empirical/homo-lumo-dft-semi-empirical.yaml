@@ -7,7 +7,7 @@
 #   Vassilis Vassiliadis
 
 interface:
-  description: "Measures band-gap and related properties of small molecules in gas-phase using semi-emperical quantum methods"
+  description: "Measures band-gap and related properties of small molecules in gas-phase using semi-empirical quantum methods"
   inputSpec:
     namingScheme: "SMILES"
     inputExtractionMethod:
@@ -15,20 +15,20 @@ interface:
         source:
           path: "input/input_smiles.csv"
   propertiesSpec:
-    - name: "band-gap" 
+    - name: "band-gap"
       description: "The difference between homo and lumo in electron-volts"
       propertyExtractionMethod:
         hookGetProperties:
           source:
             keyOutput: "OptimisationResults"
     - name: "homo"
-      description: "The energy of the highest occuppied molecular orbital in electron-volts"
+      description: "The energy of the highest occupied molecular orbital in electron-volts"
       propertyExtractionMethod:
         hookGetProperties:
           source:
             keyOutput: "OptimisationResults"
     - name: "lumo"
-      description: "The energy of the lowest unoccuppied molecular orbital in electron-volts"
+      description: "The energy of the lowest unoccupied molecular orbital in electron-volts"
       propertyExtractionMethod:
         hookGetProperties:
           source:
@@ -45,6 +45,7 @@ interface:
         hookGetProperties:
           source:
             keyOutput: "OptimisationResults"
+
 status-report:
   0:
     arguments: '1'
@@ -56,10 +57,8 @@ status-report:
     stage-weight: 0.9
 output:
   OptimisationResults:
-    data-in: ExtractEnergies/energies.csv:copy
-    description: '"homo/lumo results"'
-    stages:
-    - 1
+    data-in: stage1.ExtractEnergies/energies.csv:ref
+    description: homo/lumo results
     type: csv
 
 platforms:
@@ -81,10 +80,12 @@ environments:
     GAMESS:
       #GMSPATH: /gamess/
       PATH: /usr/local/bin/:$PATH
-      VERNO: "01"
+      VERNO: "00"
     PYTHON: {}
 
 components:
+
+  ## This component updates a general GAMESS US input file template to have a particular basis set
 - stage: 0
   name: SetBasis
   command:
@@ -96,36 +97,56 @@ components:
   name: GetMoleculeIndex
   command:
     arguments: -c \"print(%(startIndex)s + %(replica)s),\"
-    # OLD py2.7: -c \"print %(startIndex)s + %(replica)s,\"
     executable: python
   workflowAttributes:
     replicate: '%(numberMolecules)s'
+
+  ## Note row is used to name the output sdf and xyz files used later make the input files. This will give each one a unique name
+  ## over the replicas here
 - stage: 0
-  name: SMILESToGAMESSInput
+  name: SMILESToXYZ
   command:
-    arguments: --input input_smiles.csv --template input_molecule.txt --row GetMoleculeIndex:output
+    arguments: --input input_smiles.csv --row GetMoleculeIndex:output
     environment: python
     executable: bin/rdkit_smiles2coordinates.py
   references:
   - input/input_smiles.csv:copy
-  - SetBasis/input_molecule.txt:copy
   - GetMoleculeIndex:output
   resourceManager:
     config:
       backend: '%(backend)s'
     kubernetes:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
-    lsf:
-      queue: normal
-      resourceString: select[hname==tuleta10]
+
+  ## This component takes the path to xyz and sdf files (-xp and -sp) and the names of the files which in this case is
+  ## the row number in both cases. '.xyz' and '.sdf' are added in the code. The GAMESS input file is read from the
+  ## updated template in SetFunctional. The output is a GAMESS US input file.
+- stage: 0
+  name: XYZToGAMESS
+  command:
+    arguments: -xp stage0.SMILESToXYZ:ref -xf GetMoleculeIndex:output 
+      -g stage0.SetBasis/input_molecule.txt:ref -sp stage0.SMILESToXYZ:ref 
+      -sf GetMoleculeIndex:output
+    environment: python
+    executable: bin/make_gamess_input_from_template_and_xyz.py
+  references:
+  - stage0.SMILESToXYZ:ref
+  - stage0.SetBasis/input_molecule.txt:ref
+  - GetMoleculeIndex:output
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+    kubernetes:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+  ## This runs a geometry optimization using GAMESS US
 - stage: 1
   name: GeometryOptimisation
   command:
     arguments: molecule.inp 00 %(number-processors)s
     environment: gamess
-    executable: bin/run-gamess.sh
+    executable: "%(gamess-command)s"
   references:
-  - stage0.SMILESToGAMESSInput/molecule.inp:copy
+  - stage0.XYZToGAMESS/molecule.inp:copy
   workflowAttributes:
     restartHookFile: "%(gamess-restart-hook-file)s"
     restartHookOn:
@@ -140,34 +161,14 @@ components:
       walltime: "%(gamess-walltime-minutes)s"
     kubernetes:
       gracePeriod: "%(gamess-grace-period-seconds)s"
-      image: nvcr.io/hpc/gamess:17.09-r2-libcchem
-    lsf:
-      queue: normal
-      resourceString: select[hname==tuleta10]
+      image: "%(gamess-image)s"
   resourceRequest:
     memory: '%(mem)s'
     numberThreads: '%(number-processors)s'
     threadsPerCore: 1
-- stage: 1
-  name: AnalyzeEnergies
-  command:
-    arguments: -f GeometryOptimisation:ref/out.stdout*
-    environment: python
-    executable: bin/features_and_convergence.py
-  references:
-  - GeometryOptimisation:ref
-  workflowAttributes:
-    shutdownOn:
-    - KnownIssue
-  resourceManager:
-    config:
-      backend: '%(backend)s'
-    kubernetes:
-      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
-    lsf:
-      queue: normal
-      resourceString: select[hname==tuleta10]
+    gpus: '%(gamess-gpus)s'
 
+  ## Gets the label given by users from the input csv file of smiles and puts it with the caluclation information
 - stage: 1
   name: CreateLabels
   command:
@@ -184,6 +185,8 @@ components:
   - input/input_smiles.csv:ref
   workflowAttributes:
     aggregate: true
+
+  ## Gets the energy terms of interest from a GAMESS US calculation
 - stage: 1
   name: ExtractEnergies
   command:
@@ -200,15 +203,13 @@ components:
       backend: '%(backend)s'
     kubernetes:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
-    lsf:
-      queue: normal
-      resourceString: select[hname==tuleta10]
 variables:
   default:
     global:
       # VV: References python script in hooks directory to use for restartHook of GeometryOptimisation
       gamess-restart-hook-file: semi_empirical_restart.py
-      defaultq: normal
+      gamess-image: nvcr.io/hpc/gamess:17.09-r2-libcchem
+      gamess-command: bin/run-gamess.sh
       mem: '4295000000'
       backend: local
       number-processors: '8'
@@ -220,6 +221,7 @@ variables:
       gamess-walltime-minutes: 700
       # VV: how long k8s should wait between SIGTERM and SIGKILL
       gamess-grace-period-seconds: 1800
+      gamess-gpus: 0
     stages:
       0:
         stage-name: SMILES_to_GAMESS
@@ -231,3 +233,10 @@ variables:
   openshift-kubeflux:
     global:
       backend: kubernetes
+  openshift-cpu:
+    global:
+      backend: kubernetes
+      gamess-restart-hook-file: cpu_semi_empirical_restart.py
+      gamess-image: docker-na-public.artifactory.swg-devops.com/res-st4sd-community-team-applications-docker-virtual/gamess-st4sd:2019.11.30
+      gamess-command: rungms
+      gamess-version: "01"

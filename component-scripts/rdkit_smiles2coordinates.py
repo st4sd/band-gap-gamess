@@ -24,7 +24,7 @@ import csv
 import pandas as pd
 from datetime import datetime
 
-#RDKit
+# RDKit
 sys.path.append('/usr/lib/python2.7/dist-packages/')
 from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors
@@ -83,6 +83,7 @@ def setup_logger(cwd, loglev="INFO"):
 
     return log
 
+
 def sample_conformations(mol, n_conformers, r_seed=17591, RMS=False):
     """
     Generates n_conformers on the molecule mol
@@ -92,15 +93,16 @@ def sample_conformations(mol, n_conformers, r_seed=17591, RMS=False):
     """
 
     if RMS is False:
-        conformer_index = AllChem.EmbedMultipleConfs(mol, numConfs=n_conformers, numThreads=0,randomSeed=r_seed)
+        conformer_index = AllChem.EmbedMultipleConfs(mol, numConfs=n_conformers, numThreads=0, randomSeed=r_seed)
 
     else:
         conformer_index = AllChem.EmbedMultipleConfs(mol, numConfs=n_conformers, numThreads=0,
-                                                 randomSeed=r_seed, maxAttempts=10000, pruneRmsThresh=0.25)
+                                                     randomSeed=r_seed, maxAttempts=10000, pruneRmsThresh=0.25)
     # options to give above to only accept based on RMS thresh and max attempts maxAttempts=10000, pruneRmsThresh=0.25
 
     Chem.rdMolTransforms.CanonicalizeMol(mol, ignoreHs=False)
     return list(conformer_index)
+
 
 def energy_minimize_all_confs(mol, max_int=2000):
     """
@@ -122,7 +124,6 @@ def energy_minimize_all_confs(mol, max_int=2000):
         result = AllChem.UFFOptimizeMoleculeConfs(mol, maxIters=max_int, numThreads=0,
                                                   ignoreInterfragInteractions=False)
 
-
     converged = [ent[0] for ent in result]
     energies = [ent[1] for ent in result]
 
@@ -134,7 +135,7 @@ def energy_minimize_all_confs(mol, max_int=2000):
     else:
         log.info("Energy minimization of all conformers successful")
         log.info("Minimized energy: {}\n".format(*["conformer {}: Energy {} Hartree\n".format(i, energy) for i,
-                                                                                    energy in enumerate(energies)]))
+        energy in enumerate(energies)]))
 
     # Find lowest energy conformer
     min_ener = 0.0
@@ -156,6 +157,7 @@ def energy_minimize_all_confs(mol, max_int=2000):
 
     return indx
 
+
 def molecule_image(mol, smile, fnam=None, label_with_num=True):
     """
     Create a molecule image of the smiles string
@@ -166,12 +168,27 @@ def molecule_image(mol, smile, fnam=None, label_with_num=True):
     if fnam is None:
         mf = rdMolDescriptors.CalcMolFormula(mol)
         fnam = "molecule_{}".format(mf)
-            
+
     if label_with_num is True:
-         for atom in mol.GetAtoms():
-             atom.SetProp('atomLabel',"{}_{}".format(atom.GetSymbol(),str(atom.GetIdx())))
+        for atom in mol.GetAtoms():
+            atom.SetProp('atomLabel', "{}_{}".format(atom.GetSymbol(), str(atom.GetIdx())))
 
     Draw.MolToFile(mol, "{}.png".format(fnam))
+
+    DrawingOptions.atomLabelFontSize = 55
+    DrawingOptions.dotsPerAngstrom = 300
+    DrawingOptions.bondLineWidth = 3.5
+    Draw.rdMolDraw2D.PrepareMolForDrawing(mol)
+    image = Draw.rdMolDraw2D.MolDraw2DSVG(500, 500)
+    image.DrawMolecule(mol)
+    image.FinishDrawing()
+    try:
+        with open("{}.svg".format(fnam), 'wb') as f:
+            f.write(image.GetDrawingText())
+    except TypeError:
+        with open("{}.svg".format(fnam), 'w') as f:
+            f.write(image.GetDrawingText())
+
 
 def smi2coordinates(smi, n_conformers=None, random_seed=17591):
     """
@@ -189,6 +206,7 @@ def smi2coordinates(smi, n_conformers=None, random_seed=17591):
     indx = energy_minimize_all_confs(mol_with_h)
 
     return mol_with_h, indx
+
 
 def inchi2coordinates(inchi, n_conformers=None, random_seed=17591):
     """
@@ -208,7 +226,7 @@ def inchi2coordinates(inchi, n_conformers=None, random_seed=17591):
     return mol_with_h, indx
 
 
-def xyz_representation(molecule, n_conf=-1, smiles=None):
+def xyz_representation(molecule, n_conf=-1, smiles=None, filename=0):
     """
     make an xyz file representation
     :molecule: is a molecule object which has had Hydrogens added, has been embeded and has been energy minimized
@@ -231,13 +249,14 @@ def xyz_representation(molecule, n_conf=-1, smiles=None):
     coord_only = atomic_positions[["x", "y", "z"]]
     mf = rdMolDescriptors.CalcMolFormula(molecule)
 
-    with open("{}-confromer{}.xyz".format(rdMolDescriptors.CalcMolFormula(molecule), n_conf), "w") as fout:
+    with open("{}.xyz".format(filename), "w") as fout:
         fout.write("{}\n".format(molecule.GetNumAtoms()))
         if smiles is not None:
             fout.write("From RDKit: Molecule: {}: SMILES {}\n".format(mf, smiles))
         else:
             fout.write("From RDKit: Molecule: {}\n".format(mf))
         atomic_positions.to_csv(fout, header=None, index=None, sep=" ", mode="a")
+
 
 def xyz(molecule, n_conf=-1):
     """
@@ -263,6 +282,7 @@ def xyz(molecule, n_conf=-1):
 
     return atomic_positions
 
+
 def gamess_input(mol, smi, method="SCFTYP=UHF MULT=1 RUNTYP=OPTIMIZE COORD=UNIQUE",
                  basis="GBASIS=N311 NGAUSS=6 NDFUNC=1 DIFFSP=.TRUE.", indx=-1, spin=None, charge=None):
     """
@@ -271,9 +291,9 @@ def gamess_input(mol, smi, method="SCFTYP=UHF MULT=1 RUNTYP=OPTIMIZE COORD=UNIQU
     :param mol: rdkit molecule class i.e. mol = Chem.MolFromSmiles(smile_string)
     :param method: The calculation method to use in Gamess
     :param basis: The calculation basis set set up
-    :return: 
+    :return:
     """
-    
+
     mf = rdMolDescriptors.CalcMolFormula(mol)
     coordinates = xyz(mol, n_conf=indx)
     coords_csv = coordinates.to_csv(header=False, index=False, sep=" ")
@@ -291,6 +311,7 @@ def gamess_input(mol, smi, method="SCFTYP=UHF MULT=1 RUNTYP=OPTIMIZE COORD=UNIQU
             fo.write(" {}\n".format(ent))
         fo.write("$END\n")
 
+
 def gamess_input_from_template(mol, smi, name, template, indx=-1, spin=None, charge=None):
     """
     Function to make a GAMESS input from a template options file
@@ -305,7 +326,7 @@ def gamess_input_from_template(mol, smi, name, template, indx=-1, spin=None, cha
     log = logging.getLogger(__name__)
     mf = rdMolDescriptors.CalcMolFormula(mol)
     coordinates = xyz(mol, n_conf=indx)
-    atomic_masses = ["{:.1f}".format(round(atom.GetAtomicNum(),0)) for atom in mol.GetAtoms()]
+    atomic_masses = ["{:.1f}".format(round(atom.GetAtomicNum(), 0)) for atom in mol.GetAtoms()]
     log.info("Atomic mass: {}".format(atomic_masses))
     coordinates.insert(loc=1, column="masses", value=atomic_masses)
     coords_csv = coordinates.to_csv(header=False, index=False, sep=" ")
@@ -348,7 +369,7 @@ def gamess_input_from_template(mol, smi, name, template, indx=-1, spin=None, cha
 
             fout.write(" {}\n".format(line.strip()))
 
-        #fout.write("\n")
+        # fout.write("\n")
         fout.write(" $DATA\n")
         fout.write("{} {}\n".format(name, re.sub(r"[^\w]", "", mf)))
         fout.write(" C1\n")
@@ -377,7 +398,7 @@ def count_electons(mol, indx=-1):
         atom_n_e = atom.GetAtomicNum()
         atoms_sym = atom.GetSymbol()
         atom_chr = atom.GetFormalCharge()
-        # TODO: assuming if the atom has a 'radical electron' it means unpaired accounting for bonding etc 
+        # TODO: assuming if the atom has a 'radical electron' it means unpaired accounting for bonding etc
         # https://www.rdkit.org/docs/source/rdkit.Chem.rdchem.html
         rade = atom.GetNumRadicalElectrons()
 
@@ -429,6 +450,7 @@ def get_cation(smile):
     log.info("No cations found in {}.".format(smile))
     return None
 
+
 def get_anion(smile):
     """
     his is a function calculates the molecular charge and return -ve smiles and an index if the smile is multi
@@ -455,6 +477,7 @@ def get_anion(smile):
     log.info("No anions found in {}.".format(smile))
     return None
 
+
 def run():
     """
     Main run function to act based on user input
@@ -465,7 +488,7 @@ def run():
         parser = argparse.ArgumentParser(description="Command line binary points script",
                                          usage=usage, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-        #parser.add_argument("--smiles", metavar="smiles string(s)", action="store",
+        # parser.add_argument("--smiles", metavar="smiles string(s)", action="store",
         #                    help="SMILES strings to parse and get 3D coordinates of", nargs="+", default=None)
         parser.add_argument("--input", metavar="smiles string(s)", action="store",
                             help="SMILES/InChI strings to parse and get 3D coordinates of or a csv file",
@@ -486,13 +509,13 @@ def run():
                            help="The GAMESS input file template specifying GAMESS options")
         group.add_argument("--names", action="store", default=None, nargs="+",
                            help="Molecule names")
-        #group.add_argument("--inchi", metavar="InChI string(s)",action="store", default=None, nargs = "+",help = "InChI strings")
+        # group.add_argument("--inchi", metavar="InChI string(s)",action="store", default=None, nargs = "+",help = "InChI strings")
         group.add_argument("--random_seed", action="store", default=17591, type=int,
                            help="Random seed number for RDKit 3D structure set up")
         group.add_argument("--n_conformers", action="store", default=50, type=int,
-                          help="Number of chemical conformtions to consider")
+                           help="Number of chemical conformtions to consider")
         group.add_argument("--row", action="store", default=None, type=int,
-                          help="Row of csv file of smiles to make gamess input for")
+                           help="Row of csv file of smiles to make gamess input for")
         group.add_argument("--species", action="store", default="all",
                            help="If a multi-molecule smiles string is provided this species will be selected from the "
                                 "string. Arguments can be cation, anion or int specifying the index (zero based). "
@@ -516,15 +539,13 @@ def run():
 
     smiles_input = False
     inchi_input = False
-   
 
     if len(op.input) == 1 and re.search(".[csv]+$", op.input[-1]):
         log.info("Input appears to be located in file {}\nDetermining file information\n".format(op.input[-1]))
 
-
         data = pd.read_csv(op.input[-1], header=0, dtype=str)
         data.columns = [h.strip().lower() for h in data.columns]
-        
+
         if 'smiles' in data.columns:
             smiles_input = True
         elif 'inchi' in data.columns:
@@ -532,7 +553,7 @@ def run():
         else:
             log.error("ERROR - file header smiles or inchi not found one must be given")
             raise RuntimeError
-        
+
     else:
         if "inchi" in op.input.lower():
             inchi_input = True
@@ -540,7 +561,7 @@ def run():
         else:
             smiles_input = True
             log.info("SMILES given to command line:\n{}\nCycling through .....\n".format(op.input))
-        
+
     if smiles_input is True:
         try:
             if op.row is None:
@@ -559,7 +580,7 @@ def run():
 
         except IndexError as err:
             log.error("ERROR - index error likely due to input option row. This value is assumed to be 0 based i.e. "
-            "if there is one entry the row should be 0. {}".format(err))
+                      "if there is one entry the row should be 0. {}".format(err))
             log.info("Data length {} index (row) {}".format(len(data), op.row))
             raise err
 
@@ -574,10 +595,10 @@ def run():
         except KeyError as err:
             log.info(
                 "NOTE - No multiplicity (spin) states specified (no header spin) in file will set this automatically")
-        
+
         except IndexError as err:
             log.error("ERROR - index error likely due to input option row. This value is assumed to be 0 based i.e. "
-            "if there is one entry the row should be 0. {}".format(err))
+                      "if there is one entry the row should be 0. {}".format(err))
             log.info("Data length {} index (row) {}".format(len(data), op.row))
             raise err
 
@@ -591,10 +612,10 @@ def run():
 
         except KeyError as err:
             log.info("NOTE - No charge states specified (no header charge) in file will set this automatically")
-        
+
         except IndexError as err:
             log.error("ERROR - index error likely due to input option row. This value is assumed to be 0 based i.e. "
-            "if there is one entry the row should be 0. {}".format(err))
+                      "if there is one entry the row should be 0. {}".format(err))
             log.info("Data length {} index (row) {}".format(len(data), op.row))
             raise err
 
@@ -609,7 +630,6 @@ def run():
 
         if op.charge is None:
             op.charge = [None] * len(op.input)
-
 
         for inx, smi in enumerate(op.input):
             if op.names is not None:
@@ -640,16 +660,22 @@ def run():
                     log.info("Selecting the first anion found")
                     smi = get_anion(smi)
                     if smi is None:
-                       log.error("ERROR - unable to locate anion as specified by the user through "
-                                 "--species {}".format(op.species))
-                       raise RuntimeError
+                        log.error("ERROR - unable to locate anion as specified by the user through "
+                                  "--species {}".format(op.species))
+                        raise RuntimeError
                 elif op.species.lower() == "all":
                     log.info("Running on multi-molecule system")
 
-
             molecule, indx = smi2coordinates(smi, n_conformers=op.n_conformers, random_seed=op.random_seed)
+            log.info("Using conformer {}".format(indx))
             mf = rdMolDescriptors.CalcMolFormula(molecule)
-            with open("{}.sdf".format(mf), "w") as fo:
+
+            if op.row is not None:
+                outputfilename = op.row
+            else:
+                outputfilename = 0
+
+            with open("{}.sdf".format(outputfilename), "w") as fo:
                 fo.write(Chem.MolToMolBlock(molecule))
 
             if op.template is not None:
@@ -660,7 +686,7 @@ def run():
                              charge=op.charge[inx])
 
             if not op.noxyz:
-                xyz_representation(molecule, n_conf=indx, smiles=smi)
+                xyz_representation(molecule, n_conf=indx, smiles=smi, filename=outputfilename)
             if not op.noimage:
                 molecule_image(molecule, smi)
 
@@ -712,7 +738,8 @@ def run():
                     op.spin = [op.spin]
 
             except KeyError as err:
-                log.info("NOTE - No multiplicity (spin) states specified (no header spin) in file will set this automatically")
+                log.info(
+                    "NOTE - No multiplicity (spin) states specified (no header spin) in file will set this automatically")
 
             try:
                 if op.row is None:
@@ -751,8 +778,14 @@ def run():
                 name = inx
 
             molecule, indx = inchi2coordinates(inch, n_conformers=op.n_conformers, random_seed=op.random_seed)
+
+            if op.row is not None:
+                outputfilename = op.row
+            else:
+                outputfilename = 0
+
             mf = rdMolDescriptors.CalcMolFormula(molecule)
-            with open("{}.sdf".format(mf), "w") as fo:
+            with open("{}.sdf".format(outputfilename), "w") as fo:
                 fo.write(Chem.MolToMolBlock(molecule, confId=indx))
 
             if op.template is not None:
@@ -760,24 +793,25 @@ def run():
                                            charge=op.charge[inx])
             else:
                 gamess_input(molecule, inch, method=op.method, basis=op.basis, indx=indx, spin=op.spin[inx],
-                                           charge=op.charge[inx])
+                             charge=op.charge[inx])
 
             if not op.noxyz:
-                xyz_representation(molecule, n_conf=indx, smiles=inch)
+                xyz_representation(molecule, n_conf=indx, smiles=inch, filename=outputfilename)
             if not op.noimage:
                 molecule_image(molecule, inch)
+
 
 if __name__ == "__main__":
     run()
 
 # Example commandline data.csv -x -i
 # data.csv
-#label, SMILES
-#0,c1ccccc1
-#1,CCCCCC
-#2,c1ccccc1C
-#3,O
-#4,HCl
+# label, SMILES
+# 0,c1ccccc1
+# 1,CCCCCC
+# 2,c1ccccc1C
+# 3,O
+# 4,HCl
 # Example commandline CCCCCC c1ccccc1 c1ccccc1CCF
 # Example commandline CCCCCC c1ccccc1 c1ccccc1CCF -x
 # Example commandline CCCCCC c1ccccc1 c1ccccc1CCF -i
