@@ -144,7 +144,7 @@ components:
   command:
     arguments: molecule.inp 00 %(number-processors)s
     environment: gamess
-    executable: bin/run-gamess.sh
+    executable: "%(gamess-command)s"
   references:
   - stage0.XYZToGAMESS/molecule.inp:copy
   workflowAttributes:
@@ -161,11 +161,12 @@ components:
       walltime: "%(gamess-walltime-minutes)s"
     kubernetes:
       gracePeriod: "%(gamess-grace-period-seconds)s"
-      image: nvcr.io/hpc/gamess:17.09-r2-libcchem
+      image: "%(gamess-image)s"
   resourceRequest:
     memory: '%(mem)s'
     numberThreads: '%(number-processors)s'
     threadsPerCore: 1
+    gpus: '%(gamess-gpus)s'
 
   ## Gets the label given by users from the input csv file of smiles and puts it with the caluclation information
 - stage: 1
@@ -207,7 +208,8 @@ variables:
     global:
       # VV: References python script in hooks directory to use for restartHook of GeometryOptimisation
       gamess-restart-hook-file: semi_empirical_restart.py
-      defaultq: normal
+      gamess-image: nvcr.io/hpc/gamess:17.09-r2-libcchem
+      gamess-command: bin/run-gamess.sh
       mem: '4295000000'
       backend: local
       number-processors: '8'
@@ -219,6 +221,7 @@ variables:
       gamess-walltime-minutes: 700
       # VV: how long k8s should wait between SIGTERM and SIGKILL
       gamess-grace-period-seconds: 1800
+      gamess-gpus: 0
     stages:
       0:
         stage-name: SMILES_to_GAMESS
@@ -230,3 +233,10 @@ variables:
   openshift-kubeflux:
     global:
       backend: kubernetes
+  openshift-cpu:
+    global:
+      backend: kubernetes
+      gamess-restart-hook-file: cpu_semi_empirical_restart.py
+      gamess-image: docker-na-public.artifactory.swg-devops.com/res-st4sd-community-team-applications-docker-virtual/gamess-st4sd:2019.11.30
+      gamess-command: rungms
+      gamess-version: "01"

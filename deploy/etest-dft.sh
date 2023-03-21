@@ -10,3 +10,7 @@ docker pull ${TEST_IMAGE}
 docker run --rm -it -v "`pwd`:/package/" -w /tmp --entrypoint sh ${TEST_IMAGE} -c \
   "etest.py --manifest=/package/dft/manifest.yaml -l20 --platform=openshift \
   --notestExecutables /package/dft/homo-lumo-dft.yaml"
+
+docker run --rm -it -v "`pwd`:/package/" -w /tmp --entrypoint sh ${TEST_IMAGE} -c \
+  "etest.py --manifest=/package/dft/manifest.yaml -l20 --platform=openshift-cpu \
+  --notestExecutables /package/dft/homo-lumo-dft.yaml"

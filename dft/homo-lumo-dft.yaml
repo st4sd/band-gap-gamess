@@ -253,6 +253,6 @@ variables:
     global:
       backend: kubernetes
       gamess-restart-hook-file: cpu_dft_restart.py
-      gamess-image: res-st4sd-community-team-applications-docker-virtual.artifactory.swg-devops.com/gamess-st4sd:2019.11.30
+      gamess-image: docker-na-public.artifactory.swg-devops.com/res-st4sd-community-team-applications-docker-virtual/gamess-st4sd:2019.11.30
       gamess-command: rungms
       gamess-version: "01"
