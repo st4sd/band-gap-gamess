@@ -65,6 +65,7 @@ platforms:
 - default
 - openshift
 - openshift-kubeflux
+- openshift-cpu
 
 blueprint:
   openshift-kubeflux:
@@ -75,7 +76,7 @@ blueprint:
             schedulerName: kubeflux
 
 environments:
-  # Platforms that do not override the environments, use the ones that default definess
+  # Platforms that do not override the environments, use the ones that default defines
   default:
     GAMESS:
       #GMSPATH: /gamess/
