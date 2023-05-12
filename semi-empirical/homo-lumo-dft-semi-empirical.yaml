@@ -148,7 +148,7 @@ components:
 - stage: 1
   name: GeometryOptimisation
   command:
-    arguments: molecule.inp 00 %(number-processors)s
+    arguments: molecule.inp %(gamess-version)s %(number-processors)s
     environment: gamess
     executable: "%(gamess-command)s"
   references:
@@ -228,6 +228,8 @@ variables:
       # VV: how long k8s should wait between SIGTERM and SIGKILL
       gamess-grace-period-seconds: 1800
       gamess-gpus: 0
+      # The GAMESS US version in the nvidia image is 00
+      gamess-version: "00"
     stages:
       0:
         stage-name: SMILES_to_GAMESS
@@ -245,4 +247,5 @@ variables:
       gamess-restart-hook-file: cpu_semi_empirical_restart.py
       gamess-image: docker-na-public.artifactory.swg-devops.com/res-st4sd-community-team-applications-docker-virtual/gamess-st4sd:2019.11.30
       gamess-command: rungms
+      # The GAMESS US version in the CPU optimized image is 01
       gamess-version: "01"
