@@ -148,7 +148,7 @@ components:
 - stage: 1
   name: GeometryOptimisation
   command:
-    arguments: molecule.inp 00 %(number-processors)s
+    arguments: molecule.inp %(gamess-version)s %(number-processors)s
     environment: gamess
     executable: "%(gamess-command)s"
   references:
