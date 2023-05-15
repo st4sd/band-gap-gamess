@@ -66,6 +66,8 @@ platforms:
 - openshift
 - openshift-kubeflux
 - openshift-cpu
+- docker
+- docker-cpu
 
 blueprint:
   openshift-kubeflux:
@@ -83,6 +85,10 @@ environments:
       PATH: /usr/local/bin/:$PATH
     PYTHON: {}
   openshift-cpu:
+    GAMESS:
+      GMSPATH: /gamess/
+      PATH: /gamess/:$PATH
+  docker-cpu:
     GAMESS:
       GMSPATH: /gamess/
       PATH: /gamess/:$PATH
@@ -132,6 +138,8 @@ components:
       backend: '%(backend)s'
     kubernetes:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+    docker:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
 
   ## This component takes the path to xyz and sdf files (-xp and -sp) and the names of the files which in this case is
   ## the row number in both cases. '.xyz' and '.sdf' are added in the code. The GAMESS input file is read from the
@@ -152,6 +160,8 @@ components:
     config:
       backend: '%(backend)s'
     kubernetes:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+    docker:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
   ## This runs a geometry optimization using GAMESS US
 - stage: 1
@@ -176,6 +186,8 @@ components:
       walltime: "%(gamess-walltime-minutes)s"
     kubernetes:
       gracePeriod: "%(gamess-grace-period-seconds)s"
+      image: "%(gamess-image)s"
+    docker:
       image: "%(gamess-image)s"
   resourceRequest:
     memory: '%(mem)s'
@@ -218,6 +230,8 @@ components:
       backend: '%(backend)s'
     kubernetes:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+    docker:
+      image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
 variables:
   default:
     global:
@@ -257,3 +271,15 @@ variables:
       gamess-image: docker-na-public.artifactory.swg-devops.com/res-st4sd-community-team-applications-docker-virtual/gamess-st4sd:2019.11.30
       gamess-command: rungms
       gamess-version: "01"
+  docker:
+    global:
+      backend: docker
+      number-processors: 1
+  docker-cpu:
+    global:
+      backend: docker
+      gamess-restart-hook-file: cpu_semi_empirical_restart.py
+      gamess-image: docker-na-public.artifactory.swg-devops.com/res-st4sd-community-team-applications-docker-virtual/gamess-st4sd:2019.11.30
+      gamess-command: rungms
+      gamess-version: "01"
+      number-processors: 1
