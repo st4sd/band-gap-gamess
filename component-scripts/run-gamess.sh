@@ -28,7 +28,7 @@ cp /usr/local/bin/gamess/install.info "${PATH_GAMESS}/install.info"
 
 # The NVidia Image Features version 00 ONLY and target=GA ONLY
 
-if [[ "${version}" != "00" ]]; then
+if [ "${version}" != "00" ]; then
     echo "Overriding VERSION to 00"
     version=00
 fi

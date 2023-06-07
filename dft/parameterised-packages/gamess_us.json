@@ -7,13 +7,14 @@
                 "computational chemistry",
                 "homo-lumo",
                 "semi-empirical",
-                "kubeflux"
+                "kubeflux",
+                "docker"
             ],
             "maintainer": "https://github.com/michael-johnston",
             "name": "band-gap-dft-gamess-us",
             "tags": [
                 "latest",
-                "1.1.1"
+                "1.1.2"
             ]
         }
     },
@@ -28,7 +29,7 @@
                 "source": {
                     "git": {
                         "location": {
-                            "tag": "1.1.1",
+                            "tag": "1.1.2",
                             "url": "https://github.com/st4sd/band-gap-gamess.git"
                         }
                     }
