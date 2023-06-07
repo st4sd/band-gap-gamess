@@ -140,6 +140,7 @@ components:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
     docker:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+      platform: "%(docker-platform)s"
 
   ## This component takes the path to xyz and sdf files (-xp and -sp) and the names of the files which in this case is
   ## the row number in both cases. '.xyz' and '.sdf' are added in the code. The GAMESS input file is read from the
@@ -163,6 +164,7 @@ components:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
     docker:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+      platform: "%(docker-platform)s"
   ## This runs a geometry optimization using GAMESS US
 - stage: 1
   name: GeometryOptimisation
@@ -189,6 +191,7 @@ components:
       image: "%(gamess-image)s"
     docker:
       image: "%(gamess-image)s"
+      platform: "%(docker-platform)s"
   resourceRequest:
     memory: '%(mem)s'
     numberThreads: '%(number-processors)s'
@@ -232,6 +235,7 @@ components:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
     docker:
       image: quay.io/st4sd/community-applications/rdkit-st4sd:2019.09.1
+      platform: "%(docker-platform)s"
 variables:
   default:
     global:
@@ -253,6 +257,8 @@ variables:
       gamess-grace-period-seconds: 1800
       gamess-gpus: 0
       gamess-version: "00"
+      # Used to set the --platform argument of "docker [pull|run]" - leave empty for docker-like to auto-decide
+      docker-platform: ""
     stages:
       0:
         stage-name: SMILES_to_GAMESS
