@@ -40,14 +40,6 @@
         }
     },
     "parameterisation": {
-        "presets": {
-            "runtime": {
-                "args": [
-                    "--failSafeDelays=no",
-                    "--registerWorkflow=yes"
-                ]
-            }
-        },
         "executionOptions": {
             "variables": [
                 {
@@ -55,6 +47,9 @@
                 },
                 {
                     "name": "startIndex"
+                },
+                {
+                    "name":  "mem"
                 },
                 {
                     "name":  "gamess-walltime-minutes"
@@ -67,15 +62,27 @@
                 },
                 {
                     "name":  "gamess-gpus"
-                },
-                {
-                    "name":  "mem"
                 }
             ],
             "platform": [
                 "openshift",
                 "openshift-kubeflux",
                 "openshift-cpu"
+            ]
+        },
+        "presets": {
+            "environmentVariables": [],
+            "runtime": {
+                "args": [
+                    "--failSafeDelays=no",
+                    "--registerWorkflow=yes"
+                ]
+            },
+            "variables": [
+                {
+                    "name": "basis",
+                    "value": "GBASIS=PM3"
+                }
             ]
         }
     }
