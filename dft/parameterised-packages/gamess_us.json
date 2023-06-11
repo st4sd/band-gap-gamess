@@ -29,7 +29,7 @@
                 "source": {
                     "git": {
                         "location": {
-                            "tag": "1.1.2",
+                            "tag": "1.2.0",
                             "url": "https://github.com/st4sd/band-gap-gamess.git"
                         }
                     }

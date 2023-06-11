@@ -198,6 +198,49 @@ components:
     threadsPerCore: 1
     gpus: '%(gamess-gpus)s'
 
+## This switches the GAMESS US input from Geometry Optimisation to Energy Calculation
+- stage: 1
+  name: SwitchToSinglePointEnergyCalculation
+  command:
+    executable: sed
+    arguments: -i'.bak' 's/RUNTYP=OPTIMIZE/RUNTYP=ENERGY/g' molecule.inp
+    expandArguments: none
+  references:
+  - stage1.GeometryOptimisation/molecule.inp:copy
+
+  ## This runs single point calculation with GAMESS US
+- stage: 1
+  name: SinglePointCalculation
+  command:
+    arguments: molecule.inp %(gamess-version)s %(number-processors)s
+    environment: gamess
+    executable: "%(gamess-command)s"
+  references:
+  - stage1.SwitchToSinglePointEnergyCalculation/molecule.inp:copy
+  workflowAttributes:
+    # restartHookFile: "%(gamess-restart-hook-file)s"
+    restartHookOn:
+    - KnownIssue
+    - Success
+    - ResourceExhausted
+    shutdownOn:
+    - KnownIssue
+  resourceManager:
+    config:
+      backend: '%(backend)s'
+      walltime: "%(gamess-walltime-minutes)s"
+    kubernetes:
+      gracePeriod: "%(gamess-grace-period-seconds)s"
+      image: "%(gamess-image)s"
+    docker:
+      image: "%(gamess-image)s"
+      platform: "%(docker-platform)s"
+  resourceRequest:
+    memory: '%(mem)s'
+    numberThreads: '%(number-processors)s'
+    threadsPerCore: 1
+    gpus: '%(gamess-gpus)s'
+
   ## Gets the label given by users from the input csv file of smiles and puts it with the caluclation information
 - stage: 1
   name: CreateLabels
@@ -220,12 +263,12 @@ components:
 - stage: 1
   name: ExtractEnergies
   command:
-    arguments: -l CreateLabels:output GeometryOptimisation:ref
+    arguments: -l stage1.CreateLabels:output stage1.SinglePointCalculation:ref
     environment: python
     executable: bin/extract_gmsout.py
   references:
-  - GeometryOptimisation:ref
-  - CreateLabels:output
+  - stage1.SinglePointCalculation:ref
+  - stage1.CreateLabels:output
   workflowAttributes:
     aggregate: true
   resourceManager:
