@@ -203,7 +203,7 @@ components:
   name: SwitchToSinglePointEnergyCalculation
   command:
     executable: sed
-    arguments: -i'.bak' 's/RUNTYP=OPTIMIZE/RUNTYP=ENERGY/g' molecule.inp
+    arguments: -i'.bak' -E 's/RUNTYP=[A-Z_-]+/RUNTYP=ENERGY/g' molecule.inp
     expandArguments: none
   references:
   - stage1.GeometryOptimisation/molecule.inp:copy
