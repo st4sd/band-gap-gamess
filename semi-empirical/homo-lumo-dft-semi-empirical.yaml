@@ -161,6 +161,7 @@ components:
     - ResourceExhausted
     shutdownOn:
     - KnownIssue
+    - ResourceExhausted
   resourceManager:
     config:
       backend: '%(backend)s'
