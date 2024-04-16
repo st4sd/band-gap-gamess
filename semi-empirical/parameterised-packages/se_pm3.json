@@ -35,7 +35,9 @@
                 "homo",
                 "lumo",
                 "band-gap",
-                "gamess-us"
+                "gamess-us",
+                "kubeflux",
+                "docker"
             ]
         }
     },
