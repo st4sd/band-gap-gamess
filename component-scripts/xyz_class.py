@@ -68,14 +68,17 @@ class XYZParser(object):
             log.debug("Number of atoms: {}\nDescription: {}".format(self.number_of_atoms, self.description))
             xyz_df_data = []
             xyz_df_with_masses_data = []
+            xyz_df_with_charges_data = []
             per_tab = Chem.rdchem.GetPeriodicTable()
             self.masses = []
+            self.nuclear_charge = []
             for ith, line in enumerate(xfin):
                 if line:
                     try:
                         elm, x, y, z = line.strip().split()
                         log.debug("Parsed: '{}' '{}' '{}' '{}'".format(elm, x, y, z))
                         self.masses.append(per_tab.GetAtomicWeight(elm))
+                        self.nuclear_charge.append(per_tab.GetAtomicNumber(elm))
                     except IndexError:
                         log.warning("Line {} should contain element x y z but index error encountered "
                                     "please check".format(ith + 2))
@@ -101,6 +104,8 @@ class XYZParser(object):
                     log.debug("Prepared: {} {} {} {}".format(elm, x, y, z))
                     xyz_df_data.append([elm, x, y, z])
                     xyz_df_with_masses_data.append([elm, self.masses[-1], x, y, z])
+                    xyz_df_with_charges_data.append([elm, self.nuclear_charge[-1], x, y, z])
+
 
         self.xyz_df = pd.DataFrame(data=xyz_df_data, columns=["elements", "x", "y", "z"])
         log.debug(self.xyz_df)
@@ -112,6 +117,7 @@ class XYZParser(object):
         log.debug(self.elements)
 
         self.xyz_with_masses_df = pd.DataFrame(data=xyz_df_with_masses_data, columns=["elements", "masses", "x", "y", "z"])
+        self.xyz_with_charges_df = pd.DataFrame(data=xyz_df_with_charges_data, columns=["elements", "nuclear_charge", "x", "y", "z"])
 
         log.info("xyz {} parsed successfully".format(xyz_file))
 
@@ -154,6 +160,13 @@ class XYZParser(object):
         :return:
         """
         return self.xyz_with_masses_df
+
+    def get_coordinates_and_symbols_with_nuclear_charges(self) -> pd.DataFrame:
+        """
+        Function to get the dataframe of symbols nuclear charges (atomic number) and coordinates
+        :return:
+        """
+        return self.xyz_with_charges_df
 
 
     def get_elements(self) -> list:
