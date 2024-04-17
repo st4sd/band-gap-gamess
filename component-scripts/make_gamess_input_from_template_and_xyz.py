@@ -153,7 +153,6 @@ def gamess_input_from_template(mol, gamess_xyz_data, name, template, indx=-1, sp
 
     log = logging.getLogger(__name__)
 
-    log.critical("HERE")
     mf = rdMolDescriptors.CalcMolFormula(mol)
     coordinates = gamess_xyz_data[["elements", "x", "y", "z"]]
     nuclear_charges = ["{:.1f}".format(round(float(w), 0)) for w in gamess_xyz_data["nuclear_charge"]]
