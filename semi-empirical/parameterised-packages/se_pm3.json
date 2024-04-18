@@ -6,7 +6,7 @@
                     "git": {
                         "location": {
                             "url": "https://github.com/st4sd/band-gap-gamess.git",
-                            "tag": "1.1.4"
+                            "tag": "1.1.5"
                         }
                     }
                 },
@@ -22,7 +22,7 @@
             "name": "band-gap-pm3-gamess-us",
             "tags": [
                 "latest",
-                "1.1.4"
+                "1.1.5"
             ],
             "maintainer": "https://github.com/michael-johnston",
             "description": "Uses the PM3 semi-empirical method to perform the geometry optimization and calculate the band-gap and related properties. The calculation is performed with GAMESS-US",
