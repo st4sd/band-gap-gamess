@@ -13,7 +13,7 @@
             "name": "band-gap-dft-gamess-us",
             "tags": [
                 "latest",
-                "1.1.4"
+                "1.1.5"
             ]
         }
     },
@@ -28,7 +28,7 @@
                 "source": {
                     "git": {
                         "location": {
-                            "tag": "1.1.4",
+                            "tag": "1.1.5",
                             "url": "https://github.com/st4sd/band-gap-gamess.git"
                         }
                     }
