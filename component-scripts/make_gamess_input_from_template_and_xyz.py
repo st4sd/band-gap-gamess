@@ -155,14 +155,15 @@ def gamess_input_from_template(mol, gamess_xyz_data, name, template, indx=-1, sp
 
     mf = rdMolDescriptors.CalcMolFormula(mol)
     coordinates = gamess_xyz_data[["elements", "x", "y", "z"]]
-    atomic_masses = ["{:.1f}".format(round(float(w), 0)) for w in gamess_xyz_data["masses"]]
-    log.info("Atomic mass: {}".format(atomic_masses))
-    coordinates.insert(loc=1, column="masses", value=atomic_masses)
+    nuclear_charges = ["{:.1f}".format(round(float(w), 0)) for w in gamess_xyz_data["nuclear_charge"]]
+    log.info("Nuclear charges (atomic numbers): {}".format(nuclear_charges))
+    coordinates.insert(loc=1, column="nuclear_charges", value=nuclear_charges)
     coords_csv = coordinates.to_csv(header=False, index=False, sep=" ")
 
     with open(template, "r") as fin:
         temp_data = [line.strip() for line in fin if line]
 
+    # Returns a list with [total_charge, spin, number_of_valence_electrons, number_of_electrons, radical]
     elec_data = count_electons(mol)
     if spin is not None:
         elec_data[1] = spin.strip()
@@ -307,10 +308,11 @@ def main():
     # Read xyz with custom xyz class
     xyz_reader = xyz_class.XYZParser()
     xyz_reader.parse_xyz_file(op.xyz_file)
-    gamess_xyz_data = xyz_reader.get_coordinates_and_symbols_with_atomic_weights()
+    gamess_xyz_data = xyz_reader.get_coordinates_and_symbols_with_nuclear_charges()
     log.info(gamess_xyz_data)
 
     # SDF file is used to pass molecule data so RDKit can be used to get common properties
+    log.critical(op.sdf)
     mol = Chem.rdmolfiles.MolFromMolFile(op.sdf)
 
     if mol is not None:
