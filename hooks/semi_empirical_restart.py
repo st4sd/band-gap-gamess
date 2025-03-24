@@ -441,7 +441,12 @@ def determine_gamess_exit_reason(gamess_out_file, component_type):
             fails = any(ent is True for ent in [ddikick_failed, term_abnorm, stat_point_not_found])
             reasons = "ddick sent kill: {} terminated on error: {} stationary point not located: {}".format(
                 ddikick_failed, term_abnorm, stat_point_not_found)
-            log.error("GAMESS has failed for the following reasons {} but can be restarted".format(reasons))
+            if fails:
+                log_type = log.error
+            else:
+                log_type = log.info
+            
+            log_type("GAMESS has finished with the following reasons {} but can be restarted".format(reasons, fails))
     else:
         fails = False
 
@@ -513,130 +518,116 @@ def Restart(workingDirectory, restarts, componentName, log, exitReason, exitCode
     if len(subdirs) > restart_threshold:
         restarts = restarts + len(subdirs)
 
-    # Check restart method is appropiate i.e. is it a GAMESS component
-    retgopt = re.match(u"^[A-Z,a-z,0-9]*GeometryOptimisation[A-Z,a-z,0-9]*", componentType)
-    retenr = re.match(u"^[A-Z,a-z,0-9]*Energy[A-Z,a-z,0-9]*", componentType)
-
-    if retgopt:
-        log.info("Component type Geometry optimization")
-    elif retenr:
-        log.info("Component type Energy")
+    # make a backup sub-directory
+    dirNam = "Run{}".format(restarts)
+    path = os.path.join(workingDirectory, dirNam)
+    if not os.path.exists(path):
+        os.makedirs(os.path.join(workingDirectory, dirNam))
     else:
-        log.info("Component unknown restarted failed")
+        log.warning("Path {} already exists, exiting restart and closing experiment".format(path))
         return False
 
-    if retgopt or retenr:
+    # copy all content files to the backup directory
+    files = [f for f in os.listdir(workingDirectory) if os.path.isfile(os.path.join(workingDirectory, f))]
+    for f in files:
+        cpath = os.path.join(workingDirectory, f)
+        shutil.copy2(cpath, path)
+    log.info("A backup of the {} run is now stored in {}".format(restarts, path))
 
-        # make a backup sub-directory
-        dirNam = "Run{}".format(restarts)
-        path = os.path.join(workingDirectory, dirNam)
-        if not os.path.exists(path):
-            os.makedirs(os.path.join(workingDirectory, dirNam))
-        else:
-            log.warning("Path {} already exists, exiting restart and closing experiment".format(path))
+    # edit input files for restart methods
+    gamess_input = glob.glob(os.path.join(workingDirectory, "*.inp"))
+    gamess_dat_punch_file = glob.glob(os.path.join(workingDirectory, "*.dat"))
+    # TODO: specific name is there a better way?
+    gamess_out_file = glob.glob(os.path.join(workingDirectory, "out.stdout"))
+    if len(gamess_input) == 0:
+        log.error("Restart cannot find the appropriate gamess input (*.inp) file in {}".format(workingDirectory))
+        # raise RuntimeError("ERROR - cannot find GAMESS input file *.inp")
+        return False
+    elif len(gamess_input) > 1:
+        log.error("Restart has found more than one gamess input (*.inp) file in {}\nFiles found {}".format(
+            workingDirectory, gamess_input))
+        # raise RuntimeError("ERROR- found more than one GAMESS input file *.inp")
+        return False
+    else:
+        gamess_input = gamess_input[0]
+
+    if len(gamess_dat_punch_file) == 0:
+        log.error("Restart cannot find the appropriate gamess punch (*.dat) file in {}".format(workingDirectory))
+        # raise RuntimeError("ERROR - cannot find GAMESS punch file *.dat")
+        return False
+    elif len(gamess_dat_punch_file) > 1:
+        log.error("Restart has found more than one gamess punch (*.dat) file in {}\nFiles found {}".format(
+            workingDirectory, gamess_dat_punch_file))
+        # raise RuntimeError("ERROR found more than one GAMESS punch file *.dat")
+        return False
+    else:
+        gamess_dat_punch_file = gamess_dat_punch_file[0]
+
+    if len(gamess_out_file) == 0:
+        log.error(
+            "Restart cannot find the appropriate gamess out file (out.stdout) file in {}".format(workingDirectory))
+        # raise RuntimeError("ERROR - cannot find GAMESS punch file *.dat")
+        return False
+    elif len(gamess_out_file) > 1:
+        log.error("Restart has found more than one gamess out file (out.stdout) file in {}\nFiles found {}".format(
+            workingDirectory, gamess_dat_punch_file))
+        # raise RuntimeError("ERROR found more than one GAMESS punch file *.dat")
+        return False
+    else:
+        gamess_out_file = gamess_out_file[0]
+    log.info("GAMESS Input: {} GAMESS punch file {} GAMESS out file {}".format(gamess_input, gamess_dat_punch_file,
+                                                                                gamess_out_file))
+
+    # TODO: Add specific error message check and make variations
+    # this is harder to do as the documentation is very poor so it is hard to know what to do
+    # with specific errors outside of the general cases I have already dealt with.
+    # the most common case seems to require changing QMTTOL this is done by default at the
+    # momement.
+    # determine if restart is needed as this hook is called even on supposedly successful GAMESS components
+    restart_needed = determine_gamess_exit_reason(gamess_out_file, componentName)
+
+    if restart_needed is True:
+
+        log.info("Restart is determined to be required for GAMESS")
+
+        geometry = get_geometry_from_dat_file(gamess_dat_punch_file)
+        if geometry is False:
             return False
 
-        # copy all content files to the backup directory
-        files = [f for f in os.listdir(workingDirectory) if os.path.isfile(os.path.join(workingDirectory, f))]
-        for f in files:
-            cpath = os.path.join(workingDirectory, f)
-            shutil.copy2(cpath, path)
-        log.info("A backup of the {} run is now stored in {}".format(restarts, path))
-
-        # edit input files for restart methods
-        gamess_input = glob.glob(os.path.join(workingDirectory, "*.inp"))
-        gamess_dat_punch_file = glob.glob(os.path.join(workingDirectory, "*.dat"))
-        # TODO: specific name is there a better way?
-        gamess_out_file = glob.glob(os.path.join(workingDirectory, "out.stdout"))
-        if len(gamess_input) == 0:
-            log.error("Restart cannot find the appropriate gamess input (*.inp) file in {}".format(workingDirectory))
-            # raise RuntimeError("ERROR - cannot find GAMESS input file *.inp")
-            return False
-        elif len(gamess_input) > 1:
-            log.error("Restart has found more than one gamess input (*.inp) file in {}\nFiles found {}".format(
-                workingDirectory, gamess_input))
-            # raise RuntimeError("ERROR- found more than one GAMESS input file *.inp")
-            return False
-        else:
-            gamess_input = gamess_input[0]
-
-        if len(gamess_dat_punch_file) == 0:
-            log.error("Restart cannot find the appropriate gamess punch (*.dat) file in {}".format(workingDirectory))
-            # raise RuntimeError("ERROR - cannot find GAMESS punch file *.dat")
-            return False
-        elif len(gamess_dat_punch_file) > 1:
-            log.error("Restart has found more than one gamess punch (*.dat) file in {}\nFiles found {}".format(
-                workingDirectory, gamess_dat_punch_file))
-            # raise RuntimeError("ERROR found more than one GAMESS punch file *.dat")
-            return False
-        else:
-            gamess_dat_punch_file = gamess_dat_punch_file[0]
-
-        if len(gamess_out_file) == 0:
-            log.error(
-                "Restart cannot find the appropriate gamess out file (out.stdout) file in {}".format(workingDirectory))
-            # raise RuntimeError("ERROR - cannot find GAMESS punch file *.dat")
-            return False
-        elif len(gamess_out_file) > 1:
-            log.error("Restart has found more than one gamess out file (out.stdout) file in {}\nFiles found {}".format(
-                workingDirectory, gamess_dat_punch_file))
-            # raise RuntimeError("ERROR found more than one GAMESS punch file *.dat")
-            return False
-        else:
-            gamess_out_file = gamess_out_file[0]
-        log.info("GAMESS Input: {} GAMESS punch file {} GAMESS out file {}".format(gamess_input, gamess_dat_punch_file,
-                                                                                   gamess_out_file))
-
-        # TODO: Add specific error message check and make variations
-        # this is harder to do as the documentation is very poor so it is hard to know what to do
-        # with specific errors outside of the general cases I have already dealt with.
-        # the most common case seems to require changing QMTTOL this is done by default at the
-        # momement.
-        # determine if restart is needed as this hook is called even on supposedly successful GAMESS components
-        restart_needed = determine_gamess_exit_reason(gamess_out_file, componentName)
-
-        if restart_needed is True:
-
-            log.info("Restart is determined to be required for GAMESS")
-
-            geometry = get_geometry_from_dat_file(gamess_dat_punch_file)
-            if geometry is False:
-                return False
-
-            molecular_orbitals = get_vec_data(gamess_dat_punch_file)
-            if molecular_orbitals is False:
-                return False
-
-            template_data = get_template_data(gamess_input)
-            if template_data is False:
-                return False
-
-            norbs = count_molecular_orbitals(molecular_orbitals, gamess_out_file)
-            if norbs is False:
-                return False
-
-            write_file(gamess_input, geometry=geometry, template_data=template_data,
-                       molecular_orbitals=molecular_orbitals, norbs=norbs, restart=restarts)
-
-            if delete_old is True:
-                all_fs = [os.path.join(workingDirectory, f) for f in os.listdir(workingDirectory) if
-                          os.path.isfile(os.path.join(workingDirectory, f))]
-                excluded_file_types = [".inp", ".stdout", ".out", ".log", ".stderr", ".err", ".py"]
-                for ent in excluded_file_types:
-                    all_fs = [elm for elm in all_fs if ent not in elm]
-
-                for ent in all_fs:
-                    os.remove(ent)
-
-            return True
-
-        elif restart_needed is None:
-            log.info("Error that can not be solved by a simple restart detected closing down calculations")
+        molecular_orbitals = get_vec_data(gamess_dat_punch_file)
+        if molecular_orbitals is False:
             return False
 
-        else:
-            log.info("Restart is not required for GAMESS")
+        template_data = get_template_data(gamess_input)
+        if template_data is False:
             return False
+
+        norbs = count_molecular_orbitals(molecular_orbitals, gamess_out_file)
+        if norbs is False:
+            return False
+
+        write_file(gamess_input, geometry=geometry, template_data=template_data,
+                    molecular_orbitals=molecular_orbitals, norbs=norbs, restart=restarts)
+
+        if delete_old is True:
+            all_fs = [os.path.join(workingDirectory, f) for f in os.listdir(workingDirectory) if
+                        os.path.isfile(os.path.join(workingDirectory, f))]
+            excluded_file_types = [".inp", ".stdout", ".out", ".log", ".stderr", ".err", ".py"]
+            for ent in excluded_file_types:
+                all_fs = [elm for elm in all_fs if ent not in elm]
+
+            for ent in all_fs:
+                os.remove(ent)
+
+        return True
+
+    elif restart_needed is None:
+        log.info("Error that can not be solved by a simple restart detected closing down calculations")
+        return False
+
+    else:
+        log.info("Restart is not required for GAMESS")
+        return False
 
 
 if __name__ == "__main__":
